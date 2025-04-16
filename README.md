@@ -50,90 +50,119 @@ Print the first 10 binary encoded values.
 # PROGRAM
 ```
 import matplotlib.pyplot as plt
+import numpy as np
 
-# Binary data
-data = [1, 0, 1, 1, 0]
-bit_duration = 1
-Fs = 8000 # Sampling rate
-t_bit = np.linspace(0, bit_duration, Fs, endpoint=False)
+# Parameters
+sampling_rate = 5000
+duration = 0.1
+quantization_levels = 16
 
-# Carrier frequencies
-f1 = 100 # FSK freq for bit 1
-f0 = 5  # FSK freq for bit 0
-f_c = 10  # Common carrier for ASK and PSK
+# Time base
+t = np.linspace(0, duration, int(sampling_rate * duration), endpoint=False)
 
-# --- ASK Function ---
-def ask(bit):
-    return np.cos(2 * np.pi * f_c * t_bit) if bit == 1 else np.zeros(len(t_bit))
+# Two message signals
+frequency1 = 50
+frequency2 = 120
+message_signal1 = np.sin(2 * np.pi * frequency1 * t)
+message_signal2 = np.sin(2 * np.pi * frequency2 * t)
 
-# --- Repeater ---
-def repeat_waveform(fn, bitstream):
-    modulated = []
-    for b in bitstream:
-        modulated.extend(fn(b))
-    return modulated
+# Quantization
+def quantize(signal, levels):
+    step = (max(signal) - min(signal)) / levels
+    quantized = np.round(signal / step) * step
+    pcm = ((quantized - min(quantized)) / step).astype(int)
+    return quantized, pcm
 
-# Generate signals
-digital = np.repeat(data, Fs)
-ask_signal = repeat_waveform(ask, data)
+quantized_signal1, pcm_signal1 = quantize(message_signal1, quantization_levels)
+quantized_signal2, pcm_signal2 = quantize(message_signal2, quantization_levels)
 
-# FSK signal
-fsk_signal = []
-for bit in data:
-    freq = f1 if bit else f0
-    wave = np.sin(2 * np.pi * freq * t_bit)
-    fsk_signal.extend(wave)
+# Multiplexing the PCM signals
+# Interleaving samples from both signals
+multiplexed_pcm = np.empty((pcm_signal1.size + pcm_signal2.size,), dtype=int)
+multiplexed_pcm[0::2] = pcm_signal1
+multiplexed_pcm[1::2] = pcm_signal2
 
-# PSK signal
-psk_signal = []
-for bit in data:
-    phase = 0 if bit == 1 else np.pi
-    wave = np.sin(2 * np.pi * f_c * t_bit + phase)
-    psk_signal.extend(wave)
+# Time base for multiplexed stream (double samples)
+t_mux = np.linspace(0, duration, multiplexed_pcm.size, endpoint=False)
 
-# Time axis
-time = np.linspace(0, bit_duration * len(data), Fs * len(data), endpoint=False)
+# Clock signal for reference
+clock_signal = np.sign(np.sin(2 * np.pi * 200 * t))
 
 # Plotting
-plt.figure(figsize=(14, 10))
+plt.figure(figsize=(14, 12))
 
-# Digital Signal
-plt.subplot(4, 1, 1)
-plt.plot(time, digital, color='black')
-plt.title("Digital Input Signal")
+plt.subplot(8, 1, 1)
+plt.plot(t, message_signal1, label="Message Signal 1 (50Hz)", color='blue')
+plt.title("Original Message Signal 1")
+plt.xlabel("Time [s]")
+plt.ylabel("Amplitude")
+plt.grid(True)
+plt.legend()
+
+plt.subplot(8, 1, 2)
+plt.plot(t, clock_signal, label="Clock Signal", color='green')
+plt.title("Clock Signal")
+plt.xlabel("Time [s]")
 plt.ylabel("Amplitude")
 plt.grid(True)
 
-# ASK Signal
-plt.subplot(4, 1, 2)
-plt.plot(time, ask_signal, color='green')
-plt.title("Amplitude Shift Keying (ASK using Cosine Carrier)")
+plt.subplot(8, 1, 3)
+plt.step(t, quantized_signal1, label="Quantized Signal 1", color='red')
+plt.title("Quantized Signals")
+plt.xlabel("Time [s]")
+plt.ylabel("Amplitude")
+plt.grid(True)
+plt.legend()
+
+plt.subplot(8, 1, 4)
+plt.plot(t, message_signal2, label="Message Signal 2 (120Hz)", color='orange', alpha=0.7)
+plt.title("Original Message Signal 2")
+plt.xlabel("Time [s]")
+plt.ylabel("Amplitude")
+plt.grid(True)
+plt.legend()
+
+plt.subplot(8, 1, 5)
+plt.plot(t, clock_signal, label="Clock Signal", color='green')
+plt.title("Clock Signal")
+plt.xlabel("Time [s]")
 plt.ylabel("Amplitude")
 plt.grid(True)
 
-# FSK Signal
-plt.subplot(4, 1, 3)
-plt.plot(time, fsk_signal, color='blue')
-plt.title("Frequency Shift Keying (FSK)")
+plt.subplot(8, 1, 6)
+plt.step(t, quantized_signal2, label="Quantized Signal 2", color='purple', alpha=0.7)
+plt.title("Quantized Signals")
+plt.xlabel("Time [s]")
 plt.ylabel("Amplitude")
 plt.grid(True)
+plt.legend()
 
-# PSK Signal
-plt.subplot(4, 1, 4)
-plt.plot(time, psk_signal, color='red')
-plt.title("Phase Shift Keying (PSK)")
-plt.xlabel("Time (s)")
+plt.subplot(8, 1, 7)
+plt.step(t, quantized_signal1, label="Quantized Signal 1", color='red')
+plt.step(t, quantized_signal2, label="Quantized Signal 2", color='purple', alpha=0.7)
+plt.title("Quantized Signals")
+plt.xlabel("Time [s]")
 plt.ylabel("Amplitude")
 plt.grid(True)
+plt.legend()
+
+plt.subplot(8, 1, 8)
+plt.step(t_mux, multiplexed_pcm, label="Multiplexed PCM Signal", color='black')
+plt.title("Multiplexed PCM Signal (Interleaved)")
+plt.xlabel("Time [s]")
+plt.ylabel("PCM Value")
+plt.grid(True)
+plt.legend()
 
 plt.tight_layout()
 plt.show()
+
 ```
 
 # OUTPUT
 
-![Screenshot 2025-04-10 153814](https://github.com/user-attachments/assets/5caf0b8b-bbac-44a2-b70a-fd61dbada6cb)
- 
+![Screenshot 2025-04-16 214805](https://github.com/user-attachments/assets/911acaf0-696d-4cf8-bea7-b8c7de47a13a)
+
 # RESULT / CONCLUSIONS
 ```
 Thus the simulation of pulse Code Modulation is verified and the graph is simulated.
